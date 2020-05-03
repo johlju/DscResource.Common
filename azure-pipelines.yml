@@ -62,6 +62,16 @@ stages:
               downloadType: 'single'
               artifactName: 'output'
               downloadPath: '$(Build.SourcesDirectory)'
+          - powershell: |
+              Get-NetIPAddress -AddressFamily IPv4
+            name: getip1
+            displayName: 'Get IP address 1'
+          - pwsh: |
+              Get-NetIPAddress -AddressFamily IPv4 | Select -First 1 -ExpandProperty IPAddress
+              Get-NetIPAddress -AddressFamily IPv4
+              Get-NetIPAddress -AddressFamily IPv4 -PrefixOrigin Dhcp
+            name: getip2
+            displayName: 'Get IP address 2'
           - task: PowerShell@2
             name: test
             displayName: 'Run HQRM Test'
