@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Get-FileVersion`
+  - New public command to return the version information for a file. This command
+    returns the full `System.Diagnostics.FileVersionInfo` object.
+
+### Changed
+
+- Updated build scripts to Sampler 0.119.0-preview0005.
+- `Get-FileProductVersion`
+  - Changed to use the new `Get-FileVersion` command internally instead of
+    directly accessing `Get-Item` and `VersionInfo`.
+
 ### Fixed
 
 - New-*Exception
@@ -15,10 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed a bug comparing single-valued arrays in the desired state when
     TurnOffTypeChecking is used [#184](https://github.com/dsccommunity/DscResource.Common/issues/184).
 - Fix typo in `Clear-ZeroedEnumPropertyValue` help text. Fixes [#181](https://github.com/dsccommunity/DscResource.Common/issues/181).
-
-### Changed
-
-- Updated build scripts to Sampler 0.119.0-preview0005.
 
 ## [0.24.2] - 2025-08-27
 

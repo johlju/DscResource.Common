@@ -46,20 +46,45 @@ AfterAll {
 }
 
 Describe 'Get-FileProductVersion' {
-    Context 'When the file exists and has a product version' {
+    BeforeDiscovery {
+        $parameterSetTestCases = @(
+            @{
+                ExpectedParameterSetName = '__AllParameterSets'
+                ExpectedParameters       = '[-Path] <string> [<CommonParameters>]'
+            }
+        )
+    }
+
+    It 'Should have the correct parameters in parameter set <ExpectedParameterSetName>' -ForEach $parameterSetTestCases {
+        $result = (Get-Command -Name 'Get-FileProductVersion').ParameterSets |
+            Where-Object -FilterScript { $_.Name -eq $ExpectedParameterSetName } |
+            Select-Object -Property @(
+                @{ Name = 'ParameterSetName'; Expression = { $_.Name } },
+                @{ Name = 'ParameterListAsString'; Expression = { $_.ToString() } }
+            )
+
+        $result.ParameterSetName | Should -Be $ExpectedParameterSetName
+        $result.ParameterListAsString | Should -Be $ExpectedParameters
+    }
+
+    It 'Should have Path as a mandatory parameter' {
+        $parameterInfo = (Get-Command -Name 'Get-FileProductVersion').Parameters['Path']
+
+        $parameterInfo.Attributes.Mandatory | Should -BeTrue
+    }
+
+    Context 'When the file exists and has a product version as a string' {
         BeforeAll {
-            Mock -CommandName Get-Item -MockWith {
+            Mock -CommandName Get-FileVersion -MockWith {
                 return [PSCustomObject] @{
-                    Exists      = $true
-                    VersionInfo = [PSCustomObject] @{
-                        ProductVersion = '15.0.2000.5'
-                    }
+                    ProductVersion = '15.0.2000.5'
                 }
             }
         }
 
         It 'Should return the correct product version as a System.Version object' {
             $result = Get-FileProductVersion -Path (Join-Path -Path $TestDrive -ChildPath 'testfile.dll')
+
             $result | Should -BeOfType [System.Version]
             $result.Major | Should -Be 15
             $result.Minor | Should -Be 0
@@ -68,23 +93,75 @@ Describe 'Get-FileProductVersion' {
         }
     }
 
-    Context 'When Get-Item throws an exception' {
+    Context 'When the file has a product version as a System.Version object' {
         BeforeAll {
-            Mock -CommandName Get-Item -MockWith {
-                throw 'Mock exception message'
+            Mock -CommandName Get-FileVersion -MockWith {
+                return [PSCustomObject] @{
+                    ProductVersion = [System.Version] '10.5.3.2'
+                }
             }
         }
 
-        It 'Should throw the correct error' {
+        It 'Should return the correct product version as a System.Version object' {
+            $result = Get-FileProductVersion -Path (Join-Path -Path $TestDrive -ChildPath 'testfile.dll')
+
+            $result | Should -BeOfType [System.Version]
+            $result.Major | Should -Be 10
+            $result.Minor | Should -Be 5
+            $result.Build | Should -Be 3
+            $result.Revision | Should -Be 2
+        }
+    }
+
+    Context 'When the file has a non-numeric product version' {
+        BeforeAll {
+            Mock -CommandName Get-FileVersion -MockWith {
+                return [PSCustomObject] @{
+                    ProductVersion = 'Not-A-Version-String'
+                }
+            }
+        }
+
+        It 'Should throw a terminating error with the correct error message' {
             $mockFilePath = Join-Path -Path $TestDrive -ChildPath 'testfile.dll'
 
-            $mockGetFileProductVersionErrorMessage = InModuleScope -ScriptBlock {
-                $script:localizedData.Get_FileProductVersion_GetFileProductVersionError
+            $mockInvalidVersionFormatMessage = InModuleScope -ScriptBlock {
+                $script:localizedData.Get_FileProductVersion_InvalidVersionFormat
             }
 
             {
                 Get-FileProductVersion -Path $mockFilePath -ErrorAction 'Stop'
-            } | Should -Throw ($mockGetFileProductVersionErrorMessage -f $mockFilePath, 'Mock exception message')
+            } | Should -Throw ($mockInvalidVersionFormatMessage -f 'Not-A-Version-String', $mockFilePath)
+        }
+
+        It 'Should throw an error with the correct error ID' {
+            $mockFilePath = Join-Path -Path $TestDrive -ChildPath 'testfile.dll'
+
+            $result = {
+                Get-FileProductVersion -Path $mockFilePath -ErrorAction 'Stop'
+            } | Should -Throw -PassThru
+
+            # Verify the error ID is GFPV0002 for invalid version format
+            $result.FullyQualifiedErrorId | Should -BeLike 'GFPV0002,*'
+        }
+    }
+
+    Context 'When Get-FileVersion throws an exception' {
+        BeforeAll {
+            Mock -CommandName Get-FileVersion -MockWith {
+                throw 'Mock exception message'
+            }
+        }
+
+        It 'Should throw an error with the correct error ID' {
+            $mockFilePath = Join-Path -Path $TestDrive -ChildPath 'testfile.dll'
+
+            $result = {
+                Get-FileProductVersion -Path $mockFilePath -ErrorAction 'Stop'
+            } | Should -Throw -PassThru
+
+            # Verify the error ID is correct
+            $result.FullyQualifiedErrorId | Should -BeLike 'GFPV0001,*'
         }
     }
 }

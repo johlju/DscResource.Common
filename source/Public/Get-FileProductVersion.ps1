@@ -13,6 +13,14 @@
         Get-FileProductVersion -Path 'C:\Temp\setup.exe'
 
         Returns the product version of the file setup.exe as a System.Version object.
+
+    .INPUTS
+        None.
+
+    .OUTPUTS
+        `System.Version`
+
+        Returns the product version as a System.Version object.
 #>
 function Get-FileProductVersion
 {
@@ -27,14 +35,30 @@ function Get-FileProductVersion
 
     try
     {
-        $fileItem = Get-Item -Path $Path -ErrorAction 'Stop'
-
-        return [System.Version] $fileItem.VersionInfo.ProductVersion
+        $fileVersionInfo = Get-FileVersion -Path $Path -ErrorAction 'Stop'
     }
     catch
     {
         $errorMessage = $script:localizedData.Get_FileProductVersion_GetFileProductVersionError -f $Path, $_.Exception.Message
+        $exception = New-Exception -Message $errorMessage -ErrorRecord $_
 
-        Write-Error -Message $errorMessage
+        $PSCmdlet.ThrowTerminatingError(
+            (New-ErrorRecord -Exception $exception -ErrorId 'GFPV0001' -ErrorCategory ([System.Management.Automation.ErrorCategory]::ReadError) -TargetObject $Path) # cSpell: disable-line
+        )
     }
+
+    $productVersionString = $fileVersionInfo.ProductVersion
+
+    $parsedVersion = $null
+    if (-not [System.Version]::TryParse($productVersionString, [ref] $parsedVersion))
+    {
+        $errorMessage = $script:localizedData.Get_FileProductVersion_InvalidVersionFormat -f $productVersionString, $Path
+        $exception = New-Exception -Message $errorMessage
+
+        $PSCmdlet.ThrowTerminatingError(
+            (New-ErrorRecord -Exception $exception -ErrorId 'GFPV0002' -ErrorCategory ([System.Management.Automation.ErrorCategory]::InvalidData) -TargetObject $Path) # cSpell: disable-line
+        )
+    }
+
+    return $parsedVersion
 }
